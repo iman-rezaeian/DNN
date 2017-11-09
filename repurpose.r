@@ -3,9 +3,18 @@ library(igraph)
 library(visNetwork)
 library(igraph)
 
-setwd("D:/BreastCancerResearch/DrugRepositioning/R")
+#setwd("D:/BreastCancerResearch/DrugRepositioning/R/DNN/")
 
 source("NetUnion2.r")
+
+
+load("DrugGene.RData")
+load("KEGG_Matrix.RData")
+load("CandidateGenes.RData")
+
+Candidates=Subtype1
+
+
 #---------------------------------------
 
 upStream<-function(DDM,Node)
@@ -47,12 +56,6 @@ ComputePerturbation<-function(ind)
 
 #========================
 
-
-load("DrugGene.RData")
-load("KEGG_Matrix.RData")
-load("CandidateGenes.RData")
-
-Candidates=Subtype2
 
 GeneNames=data.frame(read.csv("Genes.csv"))
 names(GeneNames)="Name"
@@ -108,37 +111,26 @@ for(netcount in 1:length(Chem))
           
             Counter=Counter+1
             
-            P=extractPath(ShortestPath, start, end)
-            # Effect=1
-            # for (link in 1:(length(P)-1)) {
-            #   Effect=Effect*M_original[P[link],P[link+1]]
-            # }
-            
-            #NewM=M_original[P,P]
-            
-            NewM=matrix(data = 0,nrow = length(P),ncol = length(P))
-            for(gg in 1:(length(P)-1))
+            if(start!=end)
             {
-              NewM[gg,gg+1]=M_original[P[gg],P[gg+1]]
+              P=extractPath(ShortestPath, start, end)
+              NewM=matrix(data = 0,nrow = length(P),ncol = length(P))
+              for(gg in 1:(length(P)-1))
+              {
+                NewM[gg,gg+1]=M_original[P[gg],P[gg+1]]
+              }
+              rownames(NewM) <- colnames(NewM) <- row.names(M_original[P,P])
+              
+              DDM=NetUnion2(DDM,NewM)
             }
-            rownames(NewM) <- colnames(NewM) <- row.names(M_original[P,P])
-              
-              
             
-            if(start==end)
+            else
             {
               NewM=matrix(data=M_original[start,end],1,1)
               rownames(NewM) <- colnames(NewM)<- g
-            }
-            
-            # if (Counter==1)
-            #   DDM=NewM
-            # else
-            DDM=NetUnion2(DDM,NewM)
-          
-            #visIgraph(graph_from_adjacency_matrix(DDM,mode = "directed",weighted = TRUE), physics = FALSE, smooth = TRUE)
+              DDM=NetUnion2(DDM,NewM)
               
-            #Path=GeneNames$Name[P]
+            }
             
             
           }  
@@ -158,9 +150,8 @@ for(netcount in 1:length(Chem))
   E(G)[which(E(G)$weight==-1)]$dashes=TRUE
   E(G)$color="black"
   #visIgraph(G,physics = TRUE, smooth = TRUE)
-  net <- visIgraph(G,physics = TRUE, smooth = TRUE)
-
-  visSave(net, file = paste0(getwd(),"/Graphs/",netcount,".html"), background = "white")
+  net <- visIgraph(G,physics = TRUE,smooth = TRUE) %>% visOptions(highlightNearest = FALSE) 
+  visSave(net, file = paste0(getwd(),"/Graphs/",cval,".html") ,background = "white")
   #visSave(net, file = paste0(getwd(),"/Graphs/test.html"), background = "white")
   
   

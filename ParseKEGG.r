@@ -5,7 +5,7 @@ library(e1071)
 library(NetComp)
 
 
-setwd("D:/BreastCancerResearch/DrugRepositioning/R")
+setwd("D:/BreastCancerResearch/DrugRepositioning/R/DNN")
 source("NetUnion2.r")
 
 getKEGG<-function(){
