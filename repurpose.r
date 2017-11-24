@@ -8,13 +8,16 @@ library(igraph)
 source("NetUnion2.r")
 
 
-load("DrugGene.RData")
+#load("DrugGene.RData")
+
+load("LincsGenes.RData")
 load("KEGG_Matrix.RData")
 load("CandidateGenes.RData")
 
-Candidates=Subtype1
+Candidates=Subtype3
 
-
+#---------------------------------------
+BidirectionalPath=FALSE
 #---------------------------------------
 
 upStream<-function(DDM,Node)
@@ -60,25 +63,28 @@ ComputePerturbation<-function(ind)
 GeneNames=data.frame(read.csv("Genes.csv"))
 names(GeneNames)="Name"
 
+bb1=which(Candidates$GeneName %in% GeneNames$Name)
 
 row.names(M)<-colnames(M)<-GeneNames$Name
 row.names(M_original)<-colnames(M_original)<-GeneNames$Name
 
-Chem=unique(DrugGene$ChemicalName)
+#Chem=unique(DrugGene$ChemicalID)
 #NotFound=0
 #Found=0
 
-for(netcount in 1:length(Chem))
+for(netcount in 1:length(LincsGenes))
 {
   
+  #cval=Chem[netcount]
   
+  #cval="C521487"  #ATTENTION ----------------------------
 
-  cval=Chem[netcount]
   
   Counter=0
 
-  genes=DrugGene[which(DrugGene$ChemicalName==cval),]$GeneSymbol
-
+  #genes=DrugGene[which(DrugGene$ChemicalID==cval),]$GeneSymbol
+  genes=LincsGenes[[netcount]]$GeneName
+  
   Dmatrix=matrix(0,length(genes),length(genes))
   rownames(Dmatrix) <- colnames(Dmatrix) <- genes
   
@@ -86,8 +92,10 @@ for(netcount in 1:length(Chem))
   rownames(Cmatrix) <- colnames(Cmatrix) <- Candidates$GeneName
   
   DDM=NetUnion2(Dmatrix,Cmatrix)
+
+  #cat("\014")
+  print(genes)
   
-  cat("\014")
   cat(netcount)
   cat(" ----- ")
   cat(length(genes))
@@ -106,6 +114,7 @@ for(netcount in 1:length(Chem))
         
         if(length(start)>0 & length(end)>0)
         {
+          
           #if(!is.na(ShortestPath$length[start,end]))
           {
           
@@ -113,7 +122,10 @@ for(netcount in 1:length(Chem))
             
             if(start!=end)
             {
-              P=extractPath(ShortestPath, start, end)
+              if(BidirectionalPath==TRUE & !is.na(ShortestPath$length[end,start]) & is.na(ShortestPath$length[start,end]))
+                P=extractPath(ShortestPath, end, start)
+              else
+                P=extractPath(ShortestPath, start, end)
               NewM=matrix(data = 0,nrow = length(P),ncol = length(P))
               for(gg in 1:(length(P)-1))
               {
@@ -146,12 +158,19 @@ for(netcount in 1:length(Chem))
   V(G)$color="yellow"
   V(G)[which(V(G)$name %in% genes)]$color="blue"
   V(G)[which(V(G)$name %in% Candidates$GeneName)]$color="red"
+  V(G)[which(!V(G)$name %in% GeneNames$Name)]$size=8
   
   E(G)[which(E(G)$weight==-1)]$dashes=TRUE
   E(G)$color="black"
   #visIgraph(G,physics = TRUE, smooth = TRUE)
-  net <- visIgraph(G,physics = TRUE,smooth = TRUE) %>% visOptions(highlightNearest = FALSE) 
-  visSave(net, file = paste0(getwd(),"/Graphs/",cval,".html") ,background = "white")
+  
+  net <- visIgraph(G,physics = TRUE,smooth = TRUE) %>% 
+    visOptions(highlightNearest = TRUE) %>%
+    visNodes(shadow = FALSE)
+  
+  net$width=1400
+  net$height=800
+  visSave(net, file = paste0(getwd(),"/Graphs/",netcount,".html") ,background = "white",selfcontained = TRUE)
   #visSave(net, file = paste0(getwd(),"/Graphs/test.html"), background = "white")
   
   
