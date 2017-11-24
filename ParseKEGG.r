@@ -9,7 +9,7 @@ setwd("D:/BreastCancerResearch/DrugRepositioning/R/DNN")
 source("NetUnion2.r")
 
 getKEGG<-function(){
-  kpg <- keggPathwayGraphs("hsa", relPercThresh=0, updateCache = FALSE, verbose = TRUE)
+  kpg <- keggPathwayGraphs("hsa", relPercThresh=0, updateCache = TRUE, verbose = TRUE)
   kpg <- setEdgeWeights(kpg, edgeTypeAttr = "subtype", edgeWeightByType = list(activation = 1, inhibition = -1, expression = 1, repression = -1), defaultWeight = 0)
   save(kpg,file = "KEGG.RData")
 }
