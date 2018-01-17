@@ -4,6 +4,7 @@ library(graph)
 library(e1071)
 library(NetComp)
 
+Subtype=1
 
 setwd("D:/BreastCancerResearch/DrugRepositioning/R/DNN")
 source("NetUnion2.r")
@@ -96,10 +97,21 @@ mergeMatrix <- function()
 }
 
 createKEGG_Matrix <-function(){
+  
+  load("BC_Scores.RData")
+  cancerExp=BC_Scores[,Subtype]
+  AllCancerGenes=BC_Scores$GeneName
+  
+  load('Lincs.RData')
+  AllDrugGenes <- rownames(Lincs) <- Genes$V1
+  
+  
+  
   M=mergeMatrix()
   #Genes=read.csv("Kegg_Genes.txt")
   #G=Genes$Gene.Names
   #row.names(M)<-colnames(M)<-G
+  
   M_original=M
   
   for (i in 1:dim(M)[1])
@@ -109,9 +121,22 @@ createKEGG_Matrix <-function(){
       else
         M[i,j]=abs(M[i,j])
     }
+  
+  GeneNames=data.frame(read.csv("Genes.csv"))
+  names(GeneNames)="Name"
+  row.names(M)<-colnames(M)<-GeneNames$Name
+  row.names(M_original)<-colnames(M_original)<-GeneNames$Name
+  
+  keepKeggGenes=which(GeneNames$Name %in% AllCancerGenes & GeneNames$Name %in% AllDrugGenes)
+  GeneNames=GeneNames$Name[keepKeggGenes]
+  M=M[keepKeggGenes,keepKeggGenes]
+  M_original=M_original[keepKeggGenes,keepKeggGenes]
+  
+  
+  
   ShortestPath=allShortestPaths(M)
   
-  save(file="KEGG_Matrix.RData",M,M_original,ShortestPath)
+  save(file="KEGG_Matrix.RData",M,M_original,ShortestPath,GeneNames)
   
   
   # example -----
