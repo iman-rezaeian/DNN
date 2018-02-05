@@ -4,12 +4,14 @@ rm(list=ls(all=TRUE))
 
 
 #==========================
-Cutted=1    # 1206  4946 5876
+Cutted=1   # 5467 12017
 Subtype=1
-Cutoff=8  # cutoff for drug expression genes (between 0 and 10) - the higher the value, the algorithm keeps less genes
+Cutoff=9  # cutoff for drug expression genes (between 0 and 10) - the higher the value, the algorithm keeps less genes
+Cutoff2=50
 
 BidirectionalPath=FALSE
 VisualizeGraph=FALSE
+DEBUG=FALSE
 #==========================
 
 library(e1071)
@@ -34,10 +36,14 @@ fetchLincsExp <- function()
     list=data.frame(Lincs[,i])
     list$Name=rownames(Lincs)
     names(list)=c("DrugExp","GeneName")
+    
+    xx=list[order(abs(list$DrugExp),decreasing = TRUE),]
+    
+    Data2 = xx[1:Cutoff2,]
     Data=list[which(abs(list$DrugExp)>=Cutoff),]
     
     # print(Data$GeneName)
-    GG[[i]]<-Data
+    GG[[i]]<-Data2
   }
   return(GG)
 }
@@ -68,7 +74,7 @@ Visualize<- function()
   V(G)$color="yellow"
   V(G)[which(V(G)$name %in% DrugGenes)]$color="blue"
   V(G)[which(V(G)$name %in% CancerGenes)]$color="red"
-  V(G)[which(!V(G)$name %in% GeneNames$Name)]$size=8
+  V(G)[which(!V(G)$name %in% GeneNames)]$size=8
   
   E(G)[which(E(G)$weight==-1)]$dashes=TRUE
   E(G)$color="black"
@@ -103,69 +109,90 @@ DownStreamNodes <- function(Node)
 ### TODO: write a recursive using ComputePerturbation & upStream
 ComputeDrugPerturbation<-function(ind)
 {
-  #st=names(which(colSums(DDM)==0))
-  #G[which(G$GeneName %in% st),]$Score=1
+
   if(DPerto[ind]!=0)
+  {
     Pert=DPerto[ind]
+  }
   else
   {
+    DinProcess[ind]<<-1
+    
     cn=colnames(DDM)[ind]
     #print(cn)
     
     S=which(DDM[,ind]!=0)
     if(length(S)==0)
-      Pert=AllExp$DrugExp[ind]
+      Pert=as.numeric(AllExp$DrugExp[ind])
     else
     {
       temp=0
       for(gg in S)
       {
-        cmp <- ComputeDrugPerturbation(gg)
-        dst <- DownStreamNodes(colnames(DDM)[gg])
-        
-        temp <- temp+(DDM[gg,ind]*cmp/dst)
+        if(DinProcess[gg]==0)
+        {
+          cmp <- ComputeDrugPerturbation(gg)
+          dst <- DownStreamNodes(colnames(DDM)[gg])
+          
+          temp <- temp+(DDM[gg,ind]*cmp/dst)
+          
+        }
       }
-      
-      Pert <- AllExp$DrugExp[ind]+temp
+
+      Pert = as.numeric(AllExp$DrugExp[ind])+temp
     }
-    DPerto[ind]=Pert
+    DPerto[ind]<<-Pert
+    DinProcess[ind]<<-0
     
   }
-  return(as.numeric(Pert))
+  
+  return(Pert)
 }
 
 ComputeCancerPerturbation<-function(ind)
 {
-  #st=names(which(colSums(DDM)==0))
-  #G[which(G$GeneName %in% st),]$Score=1
   
   if(CPerto[ind]!=0)
+  {
     Pert=CPerto[ind]
+  }
   else
   {
+    CinProcess[ind]<<-1
+    
     cn=colnames(DDM)[ind]
     #print(cn)
     
     S=which(DDM[,ind]!=0)
     if(length(S)==0)
-      Pert=AllExp$CancerExp[ind]
+      Pert=as.numeric(AllExp$CancerExp[ind])
     else
     {
       temp=0
       for(gg in S)
       {
-        cmp <- ComputeCancerPerturbation(gg)
-        dst <- DownStreamNodes(colnames(DDM)[gg])
-        
-        temp <- temp+(DDM[gg,ind]*cmp/dst)
+        if(CinProcess[gg]==0)
+        {
+          cmp <- ComputeCancerPerturbation(gg)
+          dst <- DownStreamNodes(colnames(DDM)[gg])
+          
+          temp <- temp+(DDM[gg,ind]*cmp/dst)
+          
+        }
       }
-      Pert <- AllExp$CancerExp[ind]+temp
-    } 
-    CPerto[ind]=Pert
+      
+      Pert = as.numeric(AllExp$CancerExp[ind])+temp
+    }
+    CPerto[ind]<<-Pert
+    CinProcess[ind]<<-0
     
   }
+  
   return(Pert)
+  
 }
+
+
 
 
 
@@ -205,7 +232,7 @@ CancerGenes=as.character(Candidates)
 load("KEGG_Matrix.RData")
 
 
-#xx=which(GeneNames$Name %in% AllCancerGenes & GeneNames$Name %in% AllDrugGenes)
+#xx=which(GeneNames %in% AllCancerGenes & GeneNames %in% AllDrugGenes)
 
 #M=M[xx,xx]
 #M_original=M_original[xx,xx]
@@ -219,13 +246,15 @@ load("KEGG_Matrix.RData")
 
 
 
-Pert=data.frame()
+AllPert=data.frame()
 library(tictoc)
 cat("\014")
 
 for(netcount in Cutted:length(LincsGenes))
 {
   print(netcount)
+  
+
   
   DrugGenes=LincsGenes[[netcount]]$GeneName
 
@@ -264,72 +293,70 @@ for(netcount in Cutted:length(LincsGenes))
     cat("\n")
   }
   
-  #ll=DrugGenes[which(DrugGenes %in% GeneNames$Name)]
+  #ll=DrugGenes[which(DrugGenes %in% GeneNames)]
   
   tic('create DNN...')
   
   for(dg in DrugGenes)
   {
-    start=which(GeneNames$Name==dg)
+
+    start=which(GeneNames==dg)
+    
+
+    
     if(length(start)>0)
     {
+      #if(start==2826)
+       # browser()
+      
       AllMGenes=data.frame()
+      
       DDM0=matrix(0,1,1)
       rownames(DDM0) <- colnames(DDM0)<- dg
+      
       
       for(g in CancerGenes)
       {
 
-        
-        end=which(GeneNames$Name==g)
+        end=which(GeneNames==g)
         
         if(length(end)>0)
         {
           
-          #if(!is.na(ShortestPath$length[start,end]))
-          if(dg %in% AllDrugGenes & g %in% AllCancerGenes )
-          {
-            
-            
             if(start!=end)
             {
+
+              
               if(BidirectionalPath==TRUE & !is.na(ShortestPath$length[end,start]) & is.na(ShortestPath$length[start,end]))
                 P=extractPath(ShortestPath, end, start)
               else
                 P=extractPath(ShortestPath, start, end)
-              NewM=matrix(data = 0,nrow = length(P),ncol = length(P))
-              
+
               MGenes=data.frame()
               
               Counter=1
               
-              for(gg in 1:(length(P)-1))
+              for(gg in 1:length(P))
               {
-                if(row.names(M_original)[gg]%in% AllCancerGenes & row.names(M_original)[gg]%in% AllDrugGenes )
-                {
                   Counter=Counter+1
                   
-                  CG=which( AllCancerGenes== row.names(M_original)[gg] )
-                  DG=which( AllDrugGenes== row.names(M_original)[gg] )
+                  CG=which( AllCancerGenes== row.names(M_original)[P[gg]])
+                  DG=which( AllDrugGenes== row.names(M_original)[P[gg]])
                   
                   CMexp=cancerExp[CG,]$Exp
                   DMexp=Lincs[DG,netcount]
-                  MG=row.names(M_original)[gg]
+                  MG=row.names(M_original)[P[gg]]
                   
                   xx=cbind(MG,CMexp,DMexp)
                   MGenes=rbind(MGenes,xx)
                   
-                  NewM[gg,gg+1]=M_original[P[gg],P[gg+1]]
-                }
               }
-              if (Counter==length(P))
-              {
-                rownames(NewM) <- colnames(NewM) <- row.names(M_original[P,P])
-                
-                DDM0=NetUnion2(DDM0,NewM)
-                
-                AllMGenes=rbind(AllMGenes,MGenes)
-              }
+              NewM=M_original[P,P]
+              rownames(NewM) <- colnames(NewM) <- row.names(M_original[P,P])
+              
+              DDM0=NetUnion2(DDM0,NewM)
+              
+              AllMGenes=rbind(AllMGenes,MGenes)
             }
             
             else
@@ -341,14 +368,16 @@ for(netcount in Cutted:length(LincsGenes))
             }
             
             
-          }  
+           
         }
         
       }
       DDM=NetUnion2(DDM,DDM0)
       
       names(AllMGenes)=c('GeneName','CancerExp','DrugExp')
-      AllExp=rbind(AllExp,AllMGenes)
+      AllExp=unique(rbind(AllExp,AllMGenes))
+      
+      
     }
   }
   
@@ -368,9 +397,7 @@ for(netcount in Cutted:length(LincsGenes))
   
   AllExp=unique(AllExp[order(AllExp$GeneName),])
   
-  
-  if(netcount==56)
-    browser()
+
   
   DrugPert=numeric(nrow(DDM))  
   CancerPert=numeric(nrow(DDM))
@@ -378,6 +405,12 @@ for(netcount in Cutted:length(LincsGenes))
   
   DPerto=numeric(nrow(DDM))
   CPerto=numeric(nrow(DDM))
+  
+  DinProcess=numeric(nrow(DDM))
+  CinProcess=numeric(nrow(DDM))
+  
+  if(netcount==56 & DEBUG==TRUE)
+    browser()
   
 
   for(g in 1:nrow(DDM))
@@ -388,15 +421,20 @@ for(netcount in Cutted:length(LincsGenes))
     #DrugPert[g] <- CancerPert[g] <- 0
   }
   toc()
-  tic('statistical testing...')
-  KS <- ks.test(DrugPert,CancerPert)$p.value
-  Pearson <- cor(DrugPert,CancerPert)
+
+  KS <- ks.test(DrugPert,CancerPert)
+  KS_pval = KS$p.value
+  KS_D = KS$statistic
+  Pearson <- cor(DrugPert,CancerPert,method = 'pearson')
+  Kendal <- cor(DrugPert,CancerPert,method = 'kendall')
+  Spearman <- cor(DrugPert,CancerPert,method = 'spearman')
+
   Dname=paste0(Drugs$pert_iname[netcount],'_',Drugs$pert_idose[netcount],'_',Drugs$pert_itime[netcount])
   
-  td=data.frame(Dname,KS,Pearson)
-  names(td)=c('Drug','KS','Pearson')
+  td=data.frame(Dname,KS_pval,KS_D,Pearson,Kendal,Spearman)
+  names(td)=c('Drug','KS(pval)','KS(D)','Pearson','Kendal','Spearman')
   
-  Pert=rbind(Pert,td)
+  AllPert=rbind(AllPert,td)
   
   
   #for(g in Candidates$GeneName)

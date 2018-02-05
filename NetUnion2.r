@@ -52,7 +52,10 @@ NetUnion2<-function(matrix1, matrix2){
     m1<-matrix1
   }
   matrix1b<-as(m1[total.names, total.names],"matrix")
+  rownames(matrix1b)<-colnames(matrix1b)<-row.names(m1)
   matrix2b<-as(m2[total.names, total.names],"matrix")
+  rownames(matrix2b)<-colnames(matrix2b)<-row.names(m2)
+  
   matrix3=matrix(0, nrow(matrix1b),nrow(matrix1b))
   for (i in 1:nrow(matrix1b)) {
     for(j in 1:nrow(matrix2b)) {
